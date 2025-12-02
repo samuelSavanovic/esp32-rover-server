@@ -1,6 +1,6 @@
 [workspace]
 members = [
     "backend",
-    "dasbhoard",
+    "dashboard",
 ]
 resolver = "3"

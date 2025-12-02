@@ -208,6 +208,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "backend"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "futures-util",
+ "serde",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "base16"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -703,6 +717,8 @@ name = "dasbhoard"
 version = "0.1.0"
 dependencies = [
  "dioxus",
+ "dioxus-logger",
+ "tracing",
 ]
 
 [[package]]
@@ -3854,20 +3870,6 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "rover-backend"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "futures-util",
- "serde",
- "thiserror 2.0.17",
- "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
