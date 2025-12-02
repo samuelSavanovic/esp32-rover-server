@@ -1,19 +1,26 @@
-use axum::extract::ws::{WebSocketUpgrade, WebSocket, Message};
-use tokio::sync::mpsc::unbounded_channel;
 use crate::protocol::Telemetry;
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use futures_util::{sink::SinkExt, stream::StreamExt};
+use tokio::sync::mpsc::unbounded_channel;
 
-pub async fn upgrade(ws: WebSocketUpgrade,
+pub async fn esp_upgrade(
+    ws: WebSocketUpgrade,
     state: axum::extract::State<crate::AppState>,
 ) -> axum::response::Response {
     ws.on_upgrade(move |socket| async move {
         handle_socket(socket, state).await;
     })
 }
-async fn handle_socket(socket: WebSocket,  state: axum::extract::State<crate::AppState>) {
+pub async fn dashboard_upgrade(
+    ws: WebSocketUpgrade,
+    state: axum::extract::State<crate::AppState>,
+) -> axum::response::Response {
+    ws.on_upgrade(move |socket| handle_dashboard_socket(socket, state))
+}
+async fn handle_socket(socket: WebSocket, state: axum::extract::State<crate::AppState>) {
     let (mut ws_tx, mut ws_rx) = socket.split();
     let (tx, mut rx) = unbounded_channel::<Message>();
-    *state.tx.write().unwrap() = Some(tx);
+    *state.esp_tx.write().unwrap() = Some(tx);
 
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
@@ -26,15 +33,17 @@ async fn handle_socket(socket: WebSocket,  state: axum::extract::State<crate::Ap
 
     while let Some(Ok(msg)) = ws_rx.next().await {
         match msg {
-            Message::Binary(b) => {
-                match Telemetry::from_bytes(&b) {
-                    Ok(t) => {
-                        let dist:u32=t.distance_mm;
-                        println!("Received telemetry distance_mm: {}", dist);
+            Message::Binary(b) => match Telemetry::from_bytes(&b) {
+                Ok(t) => {
+                    let dist: u32 = t.distance_mm;
+                    let dashboards = state.dashboards.read().unwrap();
+
+                    for tx in dashboards.iter() {
+                        let _ = tx.send(Message::Text(dist.to_string().into()));
                     }
-                    Err(e) => println!("parse error: {}", e),
                 }
-            }
+                Err(e) => println!("parse error: {}", e),
+            },
             Message::Text(text) => println!("Received text: {}", text),
             Message::Close(_) => {
                 println!("client disconnected");
@@ -43,5 +52,41 @@ async fn handle_socket(socket: WebSocket,  state: axum::extract::State<crate::Ap
             _ => {}
         }
     }
-    *state.tx.write().unwrap() = None;
+    *state.esp_tx.write().unwrap() = None;
+}
+
+async fn handle_dashboard_socket(socket: WebSocket, state: axum::extract::State<crate::AppState>) {
+    let (mut ws_tx, mut ws_rx) = socket.split();
+    let (tx, mut rx) = unbounded_channel::<Message>();
+    {
+        let mut list = state.dashboards.write().unwrap();
+        list.push(tx);
+    }
+
+    let state_for_drop = state.clone();
+
+    tokio::spawn(async move {
+        while let Some(msg) = rx.recv().await {
+            if ws_tx.send(msg).await.is_err() {
+                println!("dashboard websocket closed (writer)");
+                break;
+            }
+        }
+
+        let mut list = state_for_drop.dashboards.write().unwrap();
+        list.retain(|_sender| false);
+    });
+
+    while let Some(Ok(msg)) = ws_rx.next().await {
+        match msg {
+            Message::Text(text) => {
+                println!("Received from dashboard: {}", text);
+            }
+            Message::Close(_) => {
+                println!("dashboard disconnected");
+                break;
+            }
+            _ => {}
+        }
+    }
 }
