@@ -8,7 +8,7 @@ use tracing::info;
 
 pub struct CarConnection {
     pub distance: ReadSignal<Option<f32>>,
-    pub send_command: Box<dyn Fn(&str)>,
+    pub send_command: Box<dyn Fn(String)>,
 }
 
 pub fn use_car_ws(url: &'static str) -> CarConnection {
@@ -64,7 +64,7 @@ pub fn use_car_ws(url: &'static str) -> CarConnection {
     });
 
     let send_command = {
-        move |cmd: &str| {
+        move |cmd: String| {
             if let Some(tx) = tx_signal() {
                 // best-effort; use send_blocking if you want to wait
                 let _ = tx.try_send(cmd.to_string());

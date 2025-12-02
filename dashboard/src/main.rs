@@ -1,4 +1,5 @@
 mod ws;
+
 use dioxus::prelude::*;
 
 use crate::ws::use_car_ws;
@@ -26,7 +27,7 @@ fn Home() -> Element {
 
             SensorCard { distance: car.distance.read().unwrap_or(0.0)}
 
-            DriveControls {}
+            DriveControls {on_command: car.send_command}
             // --- Camera placeholder ---
             div { class: "w-full max-w-2xl bg-gray-200 shadow-inner rounded h-64 flex items-center justify-center text-gray-500",
                 "Camera feed coming soon…"
@@ -46,7 +47,7 @@ fn SensorCard(distance: f32) -> Element {
 }
 
 #[component]
-fn DriveControls() -> Element {
+fn DriveControls(on_command: EventHandler<String>) -> Element {
     let mut active = use_signal(|| None);
 
     let handle_keydown = {
@@ -64,10 +65,18 @@ fn DriveControls() -> Element {
                 _ => None,
             };
             active.set(dir);
+            if let Some(d) = dir {
+                on_command(d.to_string());
+            }
         }
     };
 
-    let handle_keyup = { move |_: KeyboardEvent| active.set(None) };
+    let handle_keyup = {
+        move |_: KeyboardEvent| {
+            active.set(None);
+            on_command("Stop".into());
+        }
+    };
     rsx! {
         div {
             class: "grid grid-cols-3 gap-4 w-full max-w-sm mb-10",
@@ -116,10 +125,21 @@ fn ControlButton(label: &'static str, is_active: bool) -> Element {
         button { class, "{label}" }
     }
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Direction {
     Up,
     Down,
     Left,
     Right,
+}
+
+impl std::fmt::Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Direction::Up => write!(f, "Forward"),
+            Direction::Down => write!(f, "Backward"),
+            Direction::Left => write!(f, "Left"),
+            Direction::Right => write!(f, "Right"),
+        }
+    }
 }
