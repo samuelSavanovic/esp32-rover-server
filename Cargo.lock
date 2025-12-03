@@ -227,6 +227,7 @@ dependencies = [
  "axum",
  "futures-util",
  "serde",
+ "serde_json",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
@@ -733,6 +734,8 @@ dependencies = [
  "dioxus-logger",
  "futures-util",
  "gloo-net",
+ "serde",
+ "serde_json",
  "tracing",
 ]
 

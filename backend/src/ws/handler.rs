@@ -1,4 +1,4 @@
-use crate::protocol::Telemetry;
+use crate::protocol::{DashboardTelemetry, Telemetry};
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use futures_util::{sink::SinkExt, stream::StreamExt};
 use tokio::sync::mpsc::unbounded_channel;
@@ -35,14 +35,21 @@ async fn handle_socket(socket: WebSocket, state: axum::extract::State<crate::App
         match msg {
             Message::Binary(b) => match Telemetry::from_bytes(&b) {
                 Ok(t) => {
-                    let dist: u32 = t.distance_mm;
                     let dashboards = state.dashboards.read().unwrap();
 
                     for tx in dashboards.iter() {
-                        let _ = tx.send(Message::Text(dist.to_string().into()));
+                        let dt = DashboardTelemetry::from(&t);
+                        match serde_json::to_string(&dt) {
+                            Ok(dt) => {
+                                let _ = tx.send(Message::Text(dt.into()));
+                            }
+                            Err(err) => {
+                                eprintln!("serialization error: {}", err);
+                            }
+                        }
                     }
                 }
-                Err(e) => println!("parse error: {}", e),
+                Err(e) => eprintln!("parse error: {}", e),
             },
             Message::Text(text) => println!("Received text: {}", text),
             Message::Close(_) => {

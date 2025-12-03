@@ -1,8 +1,8 @@
 use dioxus::prelude::*;
 
 use crate::components::ControlButton;
-#[derive(Clone, Copy, PartialEq, Eq)]
 
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Direction {
     Up,
     Down,

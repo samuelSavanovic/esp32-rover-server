@@ -15,21 +15,20 @@ impl Telemetry {
 
         let kind = b[0];
         if kind != super::TYPE_TELEMETRY {
-            bail!("unexpected kind: got {}, expected {}", kind, super::TYPE_TELEMETRY);
+            bail!(
+                "unexpected kind: got {}, expected {}",
+                kind,
+                super::TYPE_TELEMETRY
+            );
         }
 
         let payload = &b[1..];
         let mut t = Telemetry { distance_mm: 0 };
 
         unsafe {
-            std::ptr::copy_nonoverlapping(
-                payload.as_ptr(),
-                &mut t as *mut _ as *mut u8,
-                expected,
-            );
+            std::ptr::copy_nonoverlapping(payload.as_ptr(), &mut t as *mut _ as *mut u8, expected);
         }
 
         Ok(t)
     }
 }
-

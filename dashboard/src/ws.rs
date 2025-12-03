@@ -4,8 +4,15 @@ use dioxus::{
 };
 use futures_util::{SinkExt, StreamExt};
 use gloo_net::websocket::{futures::WebSocket, Message};
+use serde::Deserialize;
 use tracing::info;
 
+#[derive(Deserialize)]
+pub struct DashboardTelemetry {
+    #[allow(dead_code)]
+    pub kind: u8,
+    pub distance_mm: u32,
+}
 pub struct CarConnection {
     pub distance: ReadSignal<Option<f32>>,
     pub send_command: Box<dyn Fn(String)>,
@@ -34,8 +41,11 @@ pub fn use_car_ws(url: &'static str) -> CarConnection {
             while let Some(msg) = read.next().await {
                 match msg {
                     Ok(Message::Text(text)) => {
-                        if let Ok(v) = text.parse::<f32>() {
-                            distance.set(Some(v / 10.0));
+                        match serde_json::from_str::<DashboardTelemetry>(&text) {
+                            Ok(dt) => {
+                                distance.set(Some(dt.distance_mm as f32 / 10.0));
+                            }
+                            Err(e) => info!("Deserialize error {:?}", e),
                         }
                     }
                     Ok(Message::Bytes(_)) => {
