@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use crate::components::ControlButton;
+use crate::{components::ControlButton, ws::DashboardCommand};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Direction {
@@ -8,6 +8,7 @@ enum Direction {
     Down,
     Left,
     Right,
+    Stop,
 }
 
 impl std::fmt::Display for Direction {
@@ -17,12 +18,25 @@ impl std::fmt::Display for Direction {
             Direction::Down => write!(f, "Backward"),
             Direction::Left => write!(f, "Left"),
             Direction::Right => write!(f, "Right"),
+            Direction::Stop => write!(f, "Stop"),
+        }
+    }
+}
+
+impl Into<DashboardCommand> for Direction {
+    fn into(self) -> DashboardCommand {
+        match self {
+            Direction::Up => DashboardCommand::new(255, 255),
+            Direction::Down => DashboardCommand::new(-255, -255),
+            Direction::Left => DashboardCommand::new(0, 255),
+            Direction::Right => DashboardCommand::new(255, 0),
+            Direction::Stop => DashboardCommand::new(0, 0),
         }
     }
 }
 
 #[component]
-pub fn DriveControls(on_command: EventHandler<String>) -> Element {
+pub fn DriveControls(on_command: EventHandler<DashboardCommand>) -> Element {
     let mut active = use_signal(|| None);
 
     let handle_keydown = {
@@ -41,7 +55,7 @@ pub fn DriveControls(on_command: EventHandler<String>) -> Element {
             };
             active.set(dir);
             if let Some(d) = dir {
-                on_command(d.to_string());
+                on_command(d.into());
             }
         }
     };
@@ -49,7 +63,7 @@ pub fn DriveControls(on_command: EventHandler<String>) -> Element {
     let handle_keyup = {
         move |_: KeyboardEvent| {
             active.set(None);
-            on_command("Stop".into());
+            on_command(Direction::Stop.into());
         }
     };
     rsx! {

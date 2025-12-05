@@ -1,4 +1,4 @@
-use crate::protocol::{DashboardTelemetry, Telemetry};
+use crate::protocol::{DashboardCommand, DashboardTelemetry, Telemetry};
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use futures_util::{sink::SinkExt, stream::StreamExt};
 use tokio::sync::mpsc::unbounded_channel;
@@ -86,9 +86,15 @@ async fn handle_dashboard_socket(socket: WebSocket, state: axum::extract::State<
 
     while let Some(Ok(msg)) = ws_rx.next().await {
         match msg {
-            Message::Text(text) => {
-                println!("Received from dashboard: {}", text);
-            }
+            Message::Text(text) => match serde_json::from_str::<DashboardCommand>(&text) {
+                Ok(cmd) => {
+                    println!(
+                        "Received command: left {}, right {}",
+                        cmd.left_pwm, cmd.right_pwm
+                    );
+                }
+                Err(e) => eprintln!("failed to parse json {}", e),
+            },
             Message::Close(_) => {
                 println!("dashboard disconnected");
                 break;

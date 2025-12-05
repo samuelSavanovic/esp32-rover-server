@@ -1,7 +1,9 @@
 mod command;
+mod dashboard_command;
 mod dashboard_telemetry;
 mod telemetry;
 pub use command::Command;
+pub use dashboard_command::DashboardCommand;
 pub use dashboard_telemetry::DashboardTelemetry;
 pub use telemetry::Telemetry;
 

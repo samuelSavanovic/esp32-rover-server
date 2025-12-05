@@ -4,7 +4,7 @@ use dioxus::{
 };
 use futures_util::{SinkExt, StreamExt};
 use gloo_net::websocket::{futures::WebSocket, Message};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tracing::info;
 
 #[derive(Deserialize)]
@@ -15,7 +15,24 @@ pub struct DashboardTelemetry {
 }
 pub struct CarConnection {
     pub distance: ReadSignal<Option<f32>>,
-    pub send_command: Box<dyn Fn(String)>,
+    pub send_command: Box<dyn Fn(DashboardCommand)>,
+}
+
+#[derive(Serialize)]
+pub struct DashboardCommand {
+    pub kind: u8,
+    pub left_pwm: i16,
+    pub right_pwm: i16,
+}
+
+impl DashboardCommand {
+    pub fn new(left_pwm: i16, right_pwm: i16) -> Self {
+        Self {
+            kind: 0x02,
+            left_pwm,
+            right_pwm,
+        }
+    }
 }
 
 pub fn use_car_ws(url: &'static str) -> CarConnection {
@@ -74,10 +91,9 @@ pub fn use_car_ws(url: &'static str) -> CarConnection {
     });
 
     let send_command = {
-        move |cmd: String| {
+        move |cmd: DashboardCommand| {
             if let Some(tx) = tx_signal() {
-                // best-effort; use send_blocking if you want to wait
-                let _ = tx.try_send(cmd.to_string());
+                let _ = tx.try_send(serde_json::to_string(&cmd).unwrap());
             }
         }
     };
