@@ -8,8 +8,8 @@ edition = "2021"
 
 [dependencies]
 async-channel = "2.5.0"
-dioxus = { version = "0.7.1", features = ["router"] }
-dioxus-logger = "0.7.1"
+dioxus = { version = "0.7.2", features = ["router"] }
+dioxus-logger = "0.7.2"
 futures-util = "0.3.31"
 gloo-net = { version = "0.6.0", features = ["websocket"] }
 serde = "1.0.228"
