@@ -1,4 +1,4 @@
-use crate::protocol::{DashboardCommand, DashboardTelemetry, Telemetry};
+use crate::protocol::{Command, DashboardCommand, DashboardTelemetry, Telemetry};
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use futures_util::{sink::SinkExt, stream::StreamExt};
 use tokio::sync::mpsc::unbounded_channel;
@@ -87,11 +87,22 @@ async fn handle_dashboard_socket(socket: WebSocket, state: axum::extract::State<
     while let Some(Ok(msg)) = ws_rx.next().await {
         match msg {
             Message::Text(text) => match serde_json::from_str::<DashboardCommand>(&text) {
-                Ok(cmd) => {
+                Ok(dash_cmd) => {
                     println!(
                         "Received command: left {}, right {}",
-                        cmd.left_pwm, cmd.right_pwm
+                        dash_cmd.left_pwm, dash_cmd.right_pwm
                     );
+                    let cmd = Command::from(&dash_cmd);
+                    let cmd_bytes = cmd.to_bytes();
+                    let guard = state.esp_tx.read().unwrap();
+                    if let Some(tx) = guard.as_ref() {
+                        if tx.send(Message::Binary(cmd_bytes.into())).is_ok() {
+                            println!(
+                                "Sent command: L={} R={}",
+                                dash_cmd.left_pwm, dash_cmd.right_pwm
+                            );
+                        }
+                    }
                 }
                 Err(e) => eprintln!("failed to parse json {}", e),
             },
