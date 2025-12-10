@@ -81,7 +81,7 @@ async fn handle_dashboard_socket(socket: WebSocket, state: axum::extract::State<
         }
 
         let mut list = state_for_drop.dashboards.write().unwrap();
-        list.retain(|_sender| false);
+        list.retain(|sender| !sender.is_closed());
     });
 
     while let Some(Ok(msg)) = ws_rx.next().await {
