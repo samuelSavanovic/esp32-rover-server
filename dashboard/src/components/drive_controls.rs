@@ -2,68 +2,77 @@ use dioxus::prelude::*;
 
 use crate::{components::ControlButton, ws::DashboardCommand};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Direction {
-    Up,
-    Down,
-    Left,
-    Right,
-    Stop,
+#[derive(Default, Clone, Copy, PartialEq)]
+struct KeyState {
+    up: bool,
+    down: bool,
+    left: bool,
+    right: bool,
 }
 
-impl std::fmt::Display for Direction {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Direction::Up => write!(f, "Forward"),
-            Direction::Down => write!(f, "Backward"),
-            Direction::Left => write!(f, "Left"),
-            Direction::Right => write!(f, "Right"),
-            Direction::Stop => write!(f, "Stop"),
-        }
-    }
-}
+impl KeyState {
+    fn to_command(self) -> DashboardCommand {
+        let (forward, backward) = (self.up, self.down);
+        let (left, right) = (self.left, self.right);
 
-impl Into<DashboardCommand> for Direction {
-    fn into(self) -> DashboardCommand {
-        match self {
-            Direction::Up => DashboardCommand::new(255, 255),
-            Direction::Down => DashboardCommand::new(-255, -255),
-            Direction::Left => DashboardCommand::new(0, 255),
-            Direction::Right => DashboardCommand::new(255, 0),
-            Direction::Stop => DashboardCommand::new(0, 0),
-        }
+        let (left_pwm, right_pwm) = match (forward, backward, left, right) {
+            // Forward combinations
+            (true, false, false, false) => (-255, -255),  // Forward
+            (true, false, true, false)  => (-255, -128),  // Forward-left (right motor slower)
+            (true, false, false, true)  => (-128, -255),  // Forward-right (left motor slower)
+            // Backward combinations
+            (false, true, false, false) => (255, 255),    // Backward
+            (false, true, true, false)  => (255, 128),    // Backward-left (right motor slower)
+            (false, true, false, true)  => (128, 255),    // Backward-right (left motor slower)
+            // Pure rotation (pivot turns)
+            (false, false, true, false) => (255, 0),      // Pivot left (left motor backward)
+            (false, false, false, true) => (0, 255),      // Pivot right (right motor backward)
+            // Stop (including conflicting inputs)
+            _ => (0, 0),
+        };
+        DashboardCommand::new(left_pwm, right_pwm)
     }
 }
 
 #[component]
 pub fn DriveControls(on_command: EventHandler<DashboardCommand>) -> Element {
-    let mut active = use_signal(|| None);
+    let mut keys = use_signal(KeyState::default);
 
     let handle_keydown = {
         move |ev: KeyboardEvent| {
-            let dir = match ev.key() {
-                Key::ArrowUp => Some(Direction::Up),
-                Key::ArrowDown => Some(Direction::Down),
-                Key::ArrowLeft => Some(Direction::Left),
-                Key::ArrowRight => Some(Direction::Right),
-
-                Key::Character(s) if s == "w" || s == "W" => Some(Direction::Up),
-                Key::Character(s) if s == "s" || s == "S" => Some(Direction::Down),
-                Key::Character(s) if s == "a" || s == "A" => Some(Direction::Left),
-                Key::Character(s) if s == "d" || s == "D" => Some(Direction::Right),
-                _ => None,
-            };
-            active.set(dir);
-            if let Some(d) = dir {
-                on_command(d.into());
+            let mut k = *keys.read();
+            match ev.key() {
+                Key::ArrowUp => k.up = true,
+                Key::ArrowDown => k.down = true,
+                Key::ArrowLeft => k.left = true,
+                Key::ArrowRight => k.right = true,
+                Key::Character(ref s) if s == "w" || s == "W" => k.up = true,
+                Key::Character(ref s) if s == "s" || s == "S" => k.down = true,
+                Key::Character(ref s) if s == "a" || s == "A" => k.left = true,
+                Key::Character(ref s) if s == "d" || s == "D" => k.right = true,
+                _ => return,
             }
+            keys.set(k);
+            on_command(k.to_command());
         }
     };
 
     let handle_keyup = {
-        move |_: KeyboardEvent| {
-            active.set(None);
-            on_command(Direction::Stop.into());
+        move |ev: KeyboardEvent| {
+            let mut k = *keys.read();
+            match ev.key() {
+                Key::ArrowUp => k.up = false,
+                Key::ArrowDown => k.down = false,
+                Key::ArrowLeft => k.left = false,
+                Key::ArrowRight => k.right = false,
+                Key::Character(ref s) if s == "w" || s == "W" => k.up = false,
+                Key::Character(ref s) if s == "s" || s == "S" => k.down = false,
+                Key::Character(ref s) if s == "a" || s == "A" => k.left = false,
+                Key::Character(ref s) if s == "d" || s == "D" => k.right = false,
+                _ => return,
+            }
+            keys.set(k);
+            on_command(k.to_command());
         }
     };
     rsx! {
@@ -78,24 +87,24 @@ pub fn DriveControls(on_command: EventHandler<DashboardCommand>) -> Element {
             div {}
             ControlButton {
                 label: "↑",
-                is_active: *active.read() == Some(Direction::Up),
+                is_active: keys.read().up,
             }
             div {}
 
             ControlButton {
                 label: "←",
-                is_active: *active.read() == Some(Direction::Left),
+                is_active: keys.read().left,
             }
-            ControlButton { label: "•", is_active: *active.read() == None }
+            ControlButton { label: "•", is_active: !keys.read().up && !keys.read().down && !keys.read().left && !keys.read().right }
             ControlButton {
                 label: "→",
-                is_active: *active.read() == Some(Direction::Right),
+                is_active: keys.read().right,
             }
 
             div {}
             ControlButton {
                 label: "↓",
-                is_active: *active.read() == Some(Direction::Down),
+                is_active: keys.read().down,
             }
             div {}
         }
